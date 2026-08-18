@@ -3,9 +3,9 @@ Módulo Visualizer: Aplicación Gráfica Tkinter
 
 Dashboard interactivo para el Agente de Búsquedas No Informadas:
 - Pestaña 1: Cuadrícula del Aula 10x20 con animación ultra fluida sin cuelgues.
-- Pestaña 2: Dibujo Gráfico del Árbol con orientación horizontal opuesta en Búsqueda Bidireccional (Izq ──► ⚡ ◄── Der).
+- Pestaña 2: Dibujo Gráfico del Árbol con ZOOM Interactivo (🔍 +, 🔍 -, 100%, Rueda del Ratón) y orientación bidireccional horizontal (Izq ──► ⚡ ◄── Der).
 - Pestaña 3: Tabla de Jerarquía de Nodos.
-- Pestaña 4: Análisis Complejidad y Métricas Comparativas Teóricas vs Empíricas.
+- Pestaña 4: Análisis Complejidad y Métricas Comparativas Teóricas vs Empíricas con actualización permanente.
 """
 
 import sys
@@ -32,6 +32,7 @@ class AplicacionVisualizador:
         self.raiz.geometry("1360x880")
         self.raiz.minsize(1024, 720)
 
+        # Paleta de Colores de ALTO CONTRASTE
         self.color_fondo = "#0f111a"
         self.color_panel = "#1a1c29"
         self.color_texto = "#ffffff"
@@ -51,6 +52,11 @@ class AplicacionVisualizador:
         self.resultado_algoritmo_actual = None
         self.animacion_en_ejecucion = False
         self.tarea_animacion = None
+
+        # Control de Zoom para el lienzo del árbol
+        self.factor_zoom_arbol = 1.0
+        self.ultimo_nodos_arbol = []
+        self.ultimo_resultado_dict = None
 
         self.crear_diseno()
 
@@ -262,7 +268,7 @@ class AplicacionVisualizador:
         self.dibujar_cuadricula()
 
     # -----------------------------------------------------------------
-    # Pestaña 2: Dibujo Gráfico del Árbol de Búsqueda
+    # Pestaña 2: Dibujo Gráfico del Árbol de Búsqueda con ZOOM
     # -----------------------------------------------------------------
     def configurar_pestana_arbol_grafico(self):
         contenedor = ttk.Frame(self.pestana_arbol_grafico, padding=10)
@@ -271,9 +277,30 @@ class AplicacionVisualizador:
         panel_top = ttk.Frame(contenedor)
         panel_top.pack(fill=tk.X, pady=(0, 5))
 
-        ttk.Label(panel_top, text="🌲 Dibujo Gráfico del Árbol de Búsqueda (Alto Contraste Visual)", style="Header.TLabel").pack(anchor=tk.W)
-        self.lbl_arbol_resumen = ttk.Label(panel_top, text="Genera una búsqueda para ver el árbol con TODAS las soluciones encontradas y la más ÓPTIMA.", style="Subtitle.TLabel")
+        f_tit = ttk.Frame(panel_top)
+        f_tit.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        ttk.Label(f_tit, text="🌲 Dibujo Gráfico del Árbol de Búsqueda (Alto Contraste Visual)", style="Header.TLabel").pack(anchor=tk.W)
+        self.lbl_arbol_resumen = ttk.Label(f_tit, text="Genera una búsqueda para ver el árbol con TODAS las soluciones encontradas y la más ÓPTIMA.", style="Subtitle.TLabel")
         self.lbl_arbol_resumen.pack(anchor=tk.W, pady=(0, 5))
+
+        # Panel de Control de ZOOM
+        f_zoom = ttk.Frame(panel_top)
+        f_zoom.pack(side=tk.RIGHT, padx=5)
+
+        ttk.Label(f_zoom, text="Zoom del Árbol:", font=("Segoe UI", 9, "bold")).pack(side=tk.LEFT, padx=(0, 5))
+
+        btn_zoom_in = ttk.Button(f_zoom, text="🔍 +", width=4, command=self.zoom_arbol_in)
+        btn_zoom_in.pack(side=tk.LEFT, padx=2)
+
+        btn_zoom_out = ttk.Button(f_zoom, text="🔍 -", width=4, command=self.zoom_arbol_out)
+        btn_zoom_out.pack(side=tk.LEFT, padx=2)
+
+        btn_zoom_reset = ttk.Button(f_zoom, text="🔄 100%", width=7, command=self.zoom_arbol_reset)
+        btn_zoom_reset.pack(side=tk.LEFT, padx=2)
+
+        self.lbl_zoom_val = ttk.Label(f_zoom, text="100%", font=("Segoe UI", 9, "bold"), foreground=self.color_acento)
+        self.lbl_zoom_val.pack(side=tk.LEFT, padx=5)
 
         frame_canvas = ttk.Frame(contenedor)
         frame_canvas.pack(fill=tk.BOTH, expand=True)
@@ -288,7 +315,42 @@ class AplicacionVisualizador:
         scroll_x.pack(side=tk.BOTTOM, fill=tk.X)
         self.lienzo_arbol.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
+        # Eventos para zoom interactivo con la rueda del ratón (Ctrl + Scroll / MouseWheel)
+        self.lienzo_arbol.bind("<Control-MouseWheel>", self.al_hacer_scroll_zoom)
+        self.lienzo_arbol.bind("<Button-4>", lambda e: self.zoom_arbol_in())
+        self.lienzo_arbol.bind("<Button-5>", lambda e: self.zoom_arbol_out())
+
+    def zoom_arbol_in(self):
+        if self.factor_zoom_arbol < 3.0:
+            self.factor_zoom_arbol *= 1.2
+            self.aplicar_zoom_lienzo(1.2)
+
+    def zoom_arbol_out(self):
+        if self.factor_zoom_arbol > 0.3:
+            self.factor_zoom_arbol *= 0.8333
+            self.aplicar_zoom_lienzo(0.8333)
+
+    def zoom_arbol_reset(self):
+        self.factor_zoom_arbol = 1.0
+        self.lbl_zoom_val.config(text="100%")
+        if self.ultimo_nodos_arbol:
+            self.dibujar_arbol_grafico(self.ultimo_nodos_arbol, self.ultimo_resultado_dict)
+
+    def aplicar_zoom_lienzo(self, factor_escala):
+        self.lbl_zoom_val.config(text=f"{int(self.factor_zoom_arbol * 100)}%")
+        self.lienzo_arbol.scale("all", 0, 0, factor_escala, factor_escala)
+        self.lienzo_arbol.config(scrollregion=self.lienzo_arbol.bbox("all"))
+
+    def al_hacer_scroll_zoom(self, evento):
+        if evento.delta > 0:
+            self.zoom_arbol_in()
+        else:
+            self.zoom_arbol_out()
+
     def dibujar_arbol_grafico(self, nodos_arbol, resultado_dict=None):
+        self.ultimo_nodos_arbol = nodos_arbol
+        self.ultimo_resultado_dict = resultado_dict
+
         self.lienzo_arbol.delete("all")
 
         if not nodos_arbol:
@@ -326,11 +388,6 @@ class AplicacionVisualizador:
         posiciones = {}
 
         if es_bidireccional:
-            # -----------------------------------------------------------------
-            # DISPOSICIÓN HORIZONTAL BIDIRECCIONAL OPPOSING TREES:
-            # - Árbol Adelante (S_0): Crece de IZQUIERDA a DERECHA (──►)
-            # - Árbol Atrás (S_g): Crece de DERECHA a IZQUIERDA (◄──)
-            # -----------------------------------------------------------------
             nodos_adelante = []
             nodos_atras = []
 
@@ -359,18 +416,17 @@ class AplicacionVisualizador:
             prof_max_f = max(niveles_adelante.keys(), default=0)
             prof_max_b = max(niveles_atras.keys(), default=0)
 
-            distancia_x = 130
-            separacion_y = 65
+            distancia_x = 130 * self.factor_zoom_arbol
+            separacion_y = 65 * self.factor_zoom_arbol
 
             max_nodos_v_f = max((len(v) for v in niveles_adelante.values()), default=1)
             max_nodos_v_b = max((len(v) for v in niveles_atras.values()), default=1)
             max_nodos_vertical = max(max_nodos_v_f, max_nodos_v_b)
 
-            centro_y = max(400, (max_nodos_vertical * separacion_y) / 2.0 + 80)
-            ancho_total = 100 + (prof_max_f + prof_max_b + 3) * distancia_x + 100
+            centro_y = max(400 * self.factor_zoom_arbol, (max_nodos_vertical * separacion_y) / 2.0 + 80)
+            ancho_total = (100 + (prof_max_f + prof_max_b + 3) * distancia_x + 100)
 
-            # 1. Posicionar Árbol Adelante (Desde la Izquierda hacia el Centro)
-            x_inicio_adelante = 100
+            x_inicio_adelante = 100 * self.factor_zoom_arbol
             for d in sorted(niveles_adelante.keys()):
                 nodos_lvl = niveles_adelante[d]
                 cant = len(nodos_lvl)
@@ -380,8 +436,7 @@ class AplicacionVisualizador:
                     pos_y = centro_y + (i - (cant - 1) / 2.0) * separacion_y
                     posiciones[nodo.id] = (pos_x, pos_y, "ADELANTE")
 
-            # 2. Posicionar Árbol Atrás (Desde la Derecha hacia el Centro)
-            x_inicio_atras = ancho_total - 100
+            x_inicio_atras = ancho_total - (100 * self.factor_zoom_arbol)
             for d in sorted(niveles_atras.keys()):
                 nodos_lvl = niveles_atras[d]
                 cant = len(nodos_lvl)
@@ -391,22 +446,20 @@ class AplicacionVisualizador:
                     pos_y = centro_y + (i - (cant - 1) / 2.0) * separacion_y
                     posiciones[nodo.id] = (pos_x, pos_y, "ATRAS")
 
-            # Rotulados informativos superiores
             self.lienzo_arbol.create_text(
-                x_inicio_adelante + 120, 30,
+                x_inicio_adelante + 120 * self.factor_zoom_arbol, 30,
                 text="🔵 ÁRBOL ADELANTE: S₀ ──►",
-                fill="#00D2FF", font=("Segoe UI", 12, "bold")
+                fill="#00D2FF", font=("Segoe UI", int(12 * min(1.5, max(0.8, self.factor_zoom_arbol))), "bold")
             )
             self.lienzo_arbol.create_text(
-                x_inicio_atras - 120, 30,
+                x_inicio_atras - 120 * self.factor_zoom_arbol, 30,
                 text="◄── 🟠 ÁRBOL ATRÁS: S_g",
-                fill="#FF7043", font=("Segoe UI", 12, "bold")
+                fill="#FF7043", font=("Segoe UI", int(12 * min(1.5, max(0.8, self.factor_zoom_arbol))), "bold")
             )
 
         else:
-            # Distribución estándar Top-Down para Anchura, Profundidad e Iterativa
-            distancia_y = 85
-            separacion_x = 90
+            distancia_y = 85 * self.factor_zoom_arbol
+            separacion_x = 90 * self.factor_zoom_arbol
 
             niveles = {}
             for nodo in nodos_arbol:
@@ -414,12 +467,12 @@ class AplicacionVisualizador:
                 niveles.setdefault(d, []).append(nodo)
 
             max_nodos_nivel = max(len(nodos_nivel) for nodos_nivel in niveles.values())
-            ancho_total = max(1400, max_nodos_nivel * separacion_x + 160)
+            ancho_total = max(1400 * self.factor_zoom_arbol, max_nodos_nivel * separacion_x + 160)
 
             for d in sorted(niveles.keys()):
                 nodos_en_nivel = niveles[d]
                 cantidad = len(nodos_en_nivel)
-                pos_y = 60 + d * distancia_y
+                pos_y = (60 * self.factor_zoom_arbol) + d * distancia_y
                 ancho_nivel = (cantidad - 1) * separacion_x
                 inicio_x = (ancho_total - ancho_nivel) / 2.0
 
@@ -435,14 +488,14 @@ class AplicacionVisualizador:
                 cx, cy = posiciones[nodo.id][0], posiciones[nodo.id][1]
 
                 if nodo.id in ids_camino_optimo and nodo.padre.id in ids_camino_optimo:
-                    linea_color = self.color_camino_optimo  # DORADO NEÓN
-                    ancho_linea = 5
+                    linea_color = self.color_camino_optimo
+                    ancho_linea = max(3, int(5 * self.factor_zoom_arbol))
                 elif nodo.id in ids_todos_caminos and nodo.padre.id in ids_todos_caminos:
-                    linea_color = self.color_camino_alt     # NARANJA NEÓN
-                    ancho_linea = 3
+                    linea_color = self.color_camino_alt
+                    ancho_linea = max(2, int(3 * self.factor_zoom_arbol))
                 else:
                     linea_color = "#222638"
-                    ancho_linea = 1
+                    ancho_linea = max(1, int(1 * self.factor_zoom_arbol))
 
                 self.lienzo_arbol.create_line(px, py, cx, cy, fill=linea_color, width=ancho_linea)
 
@@ -459,56 +512,58 @@ class AplicacionVisualizador:
                 fx, fy = posiciones[nf.id][0], posiciones[nf.id][1]
                 bx, by = posiciones[nb.id][0], posiciones[nb.id][1]
 
-                self.lienzo_arbol.create_line(fx, fy, bx, by, fill=self.color_camino_optimo, width=6, dash=(6, 4))
-                self.lienzo_arbol.create_text((fx + bx)/2, (fy + by)/2 - 16, text="⚡ PUNTO DE ENCUENTRO ⚡", fill="#FFD700", font=("Segoe UI", 10, "bold"))
+                self.lienzo_arbol.create_line(fx, fy, bx, by, fill=self.color_camino_optimo, width=max(4, int(6 * self.factor_zoom_arbol)), dash=(6, 4))
+                self.lienzo_arbol.create_text((fx + bx)/2, (fy + by)/2 - 16, text="⚡ PUNTO DE ENCUENTRO ⚡", fill="#FFD700", font=("Segoe UI", int(10 * min(1.5, max(0.8, self.factor_zoom_arbol))), "bold"))
 
         # -----------------------------------------------------------------
         # DIBUJAR NODOS
         # -----------------------------------------------------------------
-        radio = 24
+        radio = 24 * self.factor_zoom_arbol
+        font_sz1 = max(6, int(8 * self.factor_zoom_arbol))
+        font_sz2 = max(5, int(7 * self.factor_zoom_arbol))
+
         for nodo in nodos_arbol:
             if nodo.id not in posiciones:
                 continue
 
             cx, cy, rama_tipo = posiciones[nodo.id]
             texto_color = "#ffffff"
-            ancho_borde = 2
+            ancho_borde = max(1, int(2 * self.factor_zoom_arbol))
 
             es_encuentro = (es_bidireccional and nodo.estado == estado_interseccion)
 
             if nodo.estado == self.ambiente.estado_inicial:
-                color_relleno = self.color_inicio          # ROSA / MAGENTA NEÓN (S_0)
+                color_relleno = self.color_inicio
                 color_borde = "#ffffff"
                 texto_color = "#ffffff"
-                ancho_borde = 4
+                ancho_borde = max(2, int(4 * self.factor_zoom_arbol))
             elif nodo.estado == AmbienteCuadricula.ESTADO_OBJETIVO:
-                color_relleno = self.color_meta            # VERDE ESMERALDA NEÓN (S_g Metas)
+                color_relleno = self.color_meta
                 color_borde = "#ffffff"
                 texto_color = "#000000"
-                ancho_borde = 4
+                ancho_borde = max(2, int(4 * self.factor_zoom_arbol))
             elif es_encuentro:
-                color_relleno = self.color_camino_optimo   # DORADO NEÓN
+                color_relleno = self.color_camino_optimo
                 color_borde = "#00FF66"
                 texto_color = "#000000"
-                ancho_borde = 4
+                ancho_borde = max(2, int(4 * self.factor_zoom_arbol))
             elif nodo.id in ids_camino_optimo:
-                color_relleno = self.color_camino_optimo   # DORADO NEÓN (Camino Solución)
+                color_relleno = self.color_camino_optimo
                 color_borde = "#ffffff"
                 texto_color = "#000000"
-                ancho_borde = 3
+                ancho_borde = max(2, int(3 * self.factor_zoom_arbol))
             elif rama_tipo == "ADELANTE":
-                color_relleno = "#003b5c"                  # AZUL CYAN (Árbol Adelante)
+                color_relleno = "#003b5c"
                 color_borde = "#00d2ff"
                 texto_color = "#ffffff"
             elif rama_tipo == "ATRAS":
-                color_relleno = "#5c2b00"                  # NARANJA (Árbol Atrás)
+                color_relleno = "#5c2b00"
                 color_borde = "#ff7043"
                 texto_color = "#ffffff"
             else:
-                color_relleno = self.color_nodo_normal     # OSCURO CHARCOAL
+                color_relleno = self.color_nodo_normal
                 color_borde = "#3a405a"
                 texto_color = "#b0b8db"
-                ancho_borde = 1
 
             self.lienzo_arbol.create_oval(
                 cx - radio, cy - radio, cx + radio, cy + radio,
@@ -518,11 +573,11 @@ class AplicacionVisualizador:
             texto_id = f"N{nodo.id}"
             texto_estado = f"{nodo.estado[0]},{nodo.estado[1]}"
 
-            self.lienzo_arbol.create_text(cx, cy - 4, text=texto_id, fill=texto_color, font=("Segoe UI", 8, "bold"))
-            self.lienzo_arbol.create_text(cx, cy + 7, text=texto_estado, fill=texto_color, font=("Segoe UI", 7, "bold"))
+            self.lienzo_arbol.create_text(cx, cy - (4 * self.factor_zoom_arbol), text=texto_id, fill=texto_color, font=("Segoe UI", font_sz1, "bold"))
+            self.lienzo_arbol.create_text(cx, cy + (7 * self.factor_zoom_arbol), text=texto_estado, fill=texto_color, font=("Segoe UI", font_sz2, "bold"))
 
             if es_encuentro:
-                self.lienzo_arbol.create_text(cx, cy + radio + 12, text="⚡ ENCUENTRO", fill="#FFD700", font=("Segoe UI", 8, "bold"))
+                self.lienzo_arbol.create_text(cx, cy + radio + 12, text="⚡ ENCUENTRO", fill="#FFD700", font=("Segoe UI", font_sz1, "bold"))
 
         self.lienzo_arbol.config(scrollregion=self.lienzo_arbol.bbox("all"))
 
@@ -648,6 +703,9 @@ class AplicacionVisualizador:
         self.actualizar_ui_resultado(nombre_algo, resultado)
         self.animar_busqueda(resultado)
 
+        # Actualizar automáticamente la tabla de métricas (Pestaña 4) con el resultado actual y los demás
+        self.al_comparar_todos(solo_actualizar_tabla=True)
+
     def actualizar_ui_resultado(self, nombre_algo, resultado):
         self.lbl_res_nodos_exp.config(text=f"• Nodos Expandidos: {resultado['nodos_expandidos']}")
         self.lbl_res_nodos_gen.config(text=f"• Nodos Generados: {resultado['nodos_generados']}")
@@ -688,7 +746,7 @@ class AplicacionVisualizador:
 
         paso_animacion(0)
 
-    def al_comparar_todos(self):
+    def al_comparar_todos(self, solo_actualizar_tabla=False):
         s0 = self.ambiente.estado_inicial
 
         res_bfs = BusquedaAnchura.resolver(s0)
@@ -724,5 +782,6 @@ class AplicacionVisualizador:
                 )
             )
 
-        self.pestañas.select(self.pestana_metricas)
-        messagebox.showinfo("Comparación Completada", f"Se ejecutaron con éxito las 4 estrategias desde S₀ = {s0}.\nRevisa la pestaña de Métricas.")
+        if not solo_actualizar_tabla:
+            self.pestañas.select(self.pestana_metricas)
+            messagebox.showinfo("Comparación Completada", f"Se ejecutaron con éxito las 4 estrategias desde S₀ = {s0}.\nRevisa la pestaña de Métricas.")
