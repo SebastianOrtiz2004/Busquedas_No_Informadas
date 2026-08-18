@@ -3,7 +3,7 @@ Módulo Visualizer: Aplicación Gráfica Tkinter
 
 Dashboard interactivo para el Agente de Búsquedas No Informadas:
 - Pestaña 1: Cuadrícula del Aula 10x20 con animación ultra fluida sin cuelgues.
-- Pestaña 2: Dibujo Gráfico del Árbol con renderizado especializado para Búsqueda Bidireccional.
+- Pestaña 2: Dibujo Gráfico del Árbol con orientación horizontal opuesta en Búsqueda Bidireccional (Izq ──► ⚡ ◄── Der).
 - Pestaña 3: Tabla de Jerarquía de Nodos.
 - Pestaña 4: Análisis Complejidad y Métricas Comparativas Teóricas vs Empíricas.
 """
@@ -32,13 +32,11 @@ class AplicacionVisualizador:
         self.raiz.geometry("1360x880")
         self.raiz.minsize(1024, 720)
 
-        # Paleta de Colores de ALTO CONTRASTE para Distinción Visual Inmediata
         self.color_fondo = "#0f111a"
         self.color_panel = "#1a1c29"
         self.color_texto = "#ffffff"
         self.color_acento = "#00d2ff"
         
-        # Colores de Nodos y Caminos súper reconocibles
         self.color_inicio = "#FF007F"       # Magenta / Rosa Neón (S_0)
         self.color_meta = "#00FF66"         # Verde Esmeralda Neón (S_g)
         self.color_camino_optimo = "#FFD700"# Dorado / Amarillo Neón (Camino Óptimo)
@@ -264,7 +262,7 @@ class AplicacionVisualizador:
         self.dibujar_cuadricula()
 
     # -----------------------------------------------------------------
-    # Pestaña 2: Dibujo Gráfico del Árbol de Búsqueda (Alto Contraste y Bidireccional)
+    # Pestaña 2: Dibujo Gráfico del Árbol de Búsqueda
     # -----------------------------------------------------------------
     def configurar_pestana_arbol_grafico(self):
         contenedor = ttk.Frame(self.pestana_arbol_grafico, padding=10)
@@ -314,7 +312,7 @@ class AplicacionVisualizador:
 
         if es_bidireccional:
             self.lbl_arbol_resumen.config(
-                text=f"↔️ BÚSQUEDA BIDIRECCIONAL: Árbol Hacia Adelante (Azul) ──► ⚡ Punto de Encuentro {estado_interseccion} ◄── Árbol Hacia Atrás (Naranja) | Camino Total: {largo_optimo} pasos"
+                text=f"↔️ BÚSQUEDA BIDIRECCIONAL HORIZONTAL: Árbol Adelante S₀ (Izq ──►)  ⚡ Punto de Encuentro {estado_interseccion}  (◄── Der) Árbol Atrás S_g | Camino: {largo_optimo} pasos"
             )
         else:
             info_soluciones = f"Total Nodos: {len(nodos_arbol)} | Soluciones Encontradas: {len(nodos_solucion)} | "
@@ -326,10 +324,13 @@ class AplicacionVisualizador:
             self.lbl_arbol_resumen.config(text=info_soluciones)
 
         posiciones = {}
-        distancia_y = 85
-        separacion_x = 90
 
         if es_bidireccional:
+            # -----------------------------------------------------------------
+            # DISPOSICIÓN HORIZONTAL BIDIRECCIONAL OPPOSING TREES:
+            # - Árbol Adelante (S_0): Crece de IZQUIERDA a DERECHA (──►)
+            # - Árbol Atrás (S_g): Crece de DERECHA a IZQUIERDA (◄──)
+            # -----------------------------------------------------------------
             nodos_adelante = []
             nodos_atras = []
 
@@ -355,43 +356,58 @@ class AplicacionVisualizador:
                 d = n.profundidad
                 niveles_atras.setdefault(d, []).append(n)
 
-            max_nodos_f = max((len(v) for v in niveles_adelante.values()), default=1)
-            max_nodos_b = max((len(v) for v in niveles_atras.values()), default=1)
-            ancho_bloque = max(750, max(max_nodos_f, max_nodos_b) * separacion_x + 100)
+            prof_max_f = max(niveles_adelante.keys(), default=0)
+            prof_max_b = max(niveles_atras.keys(), default=0)
 
+            distancia_x = 130
+            separacion_y = 65
+
+            max_nodos_v_f = max((len(v) for v in niveles_adelante.values()), default=1)
+            max_nodos_v_b = max((len(v) for v in niveles_atras.values()), default=1)
+            max_nodos_vertical = max(max_nodos_v_f, max_nodos_v_b)
+
+            centro_y = max(400, (max_nodos_vertical * separacion_y) / 2.0 + 80)
+            ancho_total = 100 + (prof_max_f + prof_max_b + 3) * distancia_x + 100
+
+            # 1. Posicionar Árbol Adelante (Desde la Izquierda hacia el Centro)
+            x_inicio_adelante = 100
             for d in sorted(niveles_adelante.keys()):
                 nodos_lvl = niveles_adelante[d]
                 cant = len(nodos_lvl)
-                pos_y = 70 + d * distancia_y
-                ancho_lvl = (cant - 1) * separacion_x
-                inicio_x = 50 + (ancho_bloque - ancho_lvl) / 2.0
+                pos_x = x_inicio_adelante + d * distancia_x
 
                 for i, nodo in enumerate(nodos_lvl):
-                    posiciones[nodo.id] = (inicio_x + i * separacion_x, pos_y, "ADELANTE")
+                    pos_y = centro_y + (i - (cant - 1) / 2.0) * separacion_y
+                    posiciones[nodo.id] = (pos_x, pos_y, "ADELANTE")
 
-            offset_x_atras = ancho_bloque + 120
+            # 2. Posicionar Árbol Atrás (Desde la Derecha hacia el Centro)
+            x_inicio_atras = ancho_total - 100
             for d in sorted(niveles_atras.keys()):
                 nodos_lvl = niveles_atras[d]
                 cant = len(nodos_lvl)
-                pos_y = 70 + d * distancia_y
-                ancho_lvl = (cant - 1) * separacion_x
-                inicio_x = offset_x_atras + (ancho_bloque - ancho_lvl) / 2.0
+                pos_x = x_inicio_atras - d * distancia_x
 
                 for i, nodo in enumerate(nodos_lvl):
-                    posiciones[nodo.id] = (inicio_x + i * separacion_x, pos_y, "ATRAS")
+                    pos_y = centro_y + (i - (cant - 1) / 2.0) * separacion_y
+                    posiciones[nodo.id] = (pos_x, pos_y, "ATRAS")
 
+            # Rotulados informativos superiores
             self.lienzo_arbol.create_text(
-                ancho_bloque / 2.0 + 50, 25,
-                text="🔵 ÁRBOL HACIA ADELANTE (Desde S₀)",
-                fill="#00D2FF", font=("Segoe UI", 11, "bold")
+                x_inicio_adelante + 120, 30,
+                text="🔵 ÁRBOL ADELANTE: S₀ ──►",
+                fill="#00D2FF", font=("Segoe UI", 12, "bold")
             )
             self.lienzo_arbol.create_text(
-                offset_x_atras + ancho_bloque / 2.0, 25,
-                text="🟠 ÁRBOL HACIA ATRÁS (Desde S_g)",
-                fill="#FF7043", font=("Segoe UI", 11, "bold")
+                x_inicio_atras - 120, 30,
+                text="◄── 🟠 ÁRBOL ATRÁS: S_g",
+                fill="#FF7043", font=("Segoe UI", 12, "bold")
             )
 
         else:
+            # Distribución estándar Top-Down para Anchura, Profundidad e Iterativa
+            distancia_y = 85
+            separacion_x = 90
+
             niveles = {}
             for nodo in nodos_arbol:
                 d = nodo.profundidad
@@ -410,16 +426,19 @@ class AplicacionVisualizador:
                 for i, nodo in enumerate(nodos_en_nivel):
                     posiciones[nodo.id] = (inicio_x + i * separacion_x, pos_y, "ESTANDAR")
 
+        # -----------------------------------------------------------------
+        # DIBUJAR ARISTAS Y RAMAS
+        # -----------------------------------------------------------------
         for nodo in nodos_arbol:
             if nodo.padre and nodo.padre.id in posiciones and nodo.id in posiciones:
                 px, py = posiciones[nodo.padre.id][0], posiciones[nodo.padre.id][1]
                 cx, cy = posiciones[nodo.id][0], posiciones[nodo.id][1]
 
                 if nodo.id in ids_camino_optimo and nodo.padre.id in ids_camino_optimo:
-                    linea_color = self.color_camino_optimo
+                    linea_color = self.color_camino_optimo  # DORADO NEÓN
                     ancho_linea = 5
                 elif nodo.id in ids_todos_caminos and nodo.padre.id in ids_todos_caminos:
-                    linea_color = self.color_camino_alt
+                    linea_color = self.color_camino_alt     # NARANJA NEÓN
                     ancho_linea = 3
                 else:
                     linea_color = "#222638"
@@ -427,6 +446,9 @@ class AplicacionVisualizador:
 
                 self.lienzo_arbol.create_line(px, py, cx, cy, fill=linea_color, width=ancho_linea)
 
+        # -----------------------------------------------------------------
+        # CONEXIÓN EN EL CENTRO PARA BÚSQUEDA BIDIRECCIONAL
+        # -----------------------------------------------------------------
         if es_bidireccional:
             nodos_encuentro_adelante = [n for n in nodos_arbol if n.estado == estado_interseccion and posiciones[n.id][2] == "ADELANTE"]
             nodos_encuentro_atras = [n for n in nodos_arbol if n.estado == estado_interseccion and posiciones[n.id][2] == "ATRAS"]
@@ -438,8 +460,11 @@ class AplicacionVisualizador:
                 bx, by = posiciones[nb.id][0], posiciones[nb.id][1]
 
                 self.lienzo_arbol.create_line(fx, fy, bx, by, fill=self.color_camino_optimo, width=6, dash=(6, 4))
-                self.lienzo_arbol.create_text((fx + bx)/2, (fy + by)/2 - 12, text="⚡ PUNTO DE ENCUENTRO ⚡", fill="#FFD700", font=("Segoe UI", 9, "bold"))
+                self.lienzo_arbol.create_text((fx + bx)/2, (fy + by)/2 - 16, text="⚡ PUNTO DE ENCUENTRO ⚡", fill="#FFD700", font=("Segoe UI", 10, "bold"))
 
+        # -----------------------------------------------------------------
+        # DIBUJAR NODOS
+        # -----------------------------------------------------------------
         radio = 24
         for nodo in nodos_arbol:
             if nodo.id not in posiciones:
@@ -452,35 +477,35 @@ class AplicacionVisualizador:
             es_encuentro = (es_bidireccional and nodo.estado == estado_interseccion)
 
             if nodo.estado == self.ambiente.estado_inicial:
-                color_relleno = self.color_inicio
+                color_relleno = self.color_inicio          # ROSA / MAGENTA NEÓN (S_0)
                 color_borde = "#ffffff"
                 texto_color = "#ffffff"
                 ancho_borde = 4
             elif nodo.estado == AmbienteCuadricula.ESTADO_OBJETIVO:
-                color_relleno = self.color_meta
+                color_relleno = self.color_meta            # VERDE ESMERALDA NEÓN (S_g Metas)
                 color_borde = "#ffffff"
                 texto_color = "#000000"
                 ancho_borde = 4
             elif es_encuentro:
-                color_relleno = self.color_camino_optimo
+                color_relleno = self.color_camino_optimo   # DORADO NEÓN
                 color_borde = "#00FF66"
                 texto_color = "#000000"
                 ancho_borde = 4
             elif nodo.id in ids_camino_optimo:
-                color_relleno = self.color_camino_optimo
+                color_relleno = self.color_camino_optimo   # DORADO NEÓN (Camino Solución)
                 color_borde = "#ffffff"
                 texto_color = "#000000"
                 ancho_borde = 3
             elif rama_tipo == "ADELANTE":
-                color_relleno = "#003b5c"
+                color_relleno = "#003b5c"                  # AZUL CYAN (Árbol Adelante)
                 color_borde = "#00d2ff"
                 texto_color = "#ffffff"
             elif rama_tipo == "ATRAS":
-                color_relleno = "#5c2b00"
+                color_relleno = "#5c2b00"                  # NARANJA (Árbol Atrás)
                 color_borde = "#ff7043"
                 texto_color = "#ffffff"
             else:
-                color_relleno = self.color_nodo_normal
+                color_relleno = self.color_nodo_normal     # OSCURO CHARCOAL
                 color_borde = "#3a405a"
                 texto_color = "#b0b8db"
                 ancho_borde = 1
