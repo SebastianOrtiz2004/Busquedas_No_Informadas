@@ -3,7 +3,7 @@ Módulo Visualizer: Aplicación Gráfica Tkinter
 
 Dashboard interactivo para el Agente de Búsquedas No Informadas:
 - Pestaña 1: Cuadrícula del Aula 10x20 con animación ultra fluida sin cuelgues.
-- Pestaña 2: Dibujo Gráfico del Árbol con colores de ALTO CONTRASTE y máxima distinción visual.
+- Pestaña 2: Dibujo Gráfico del Árbol con renderizado especializado para Búsqueda Bidireccional.
 - Pestaña 3: Tabla de Jerarquía de Nodos.
 - Pestaña 4: Análisis Complejidad y Métricas Comparativas Teóricas vs Empíricas.
 """
@@ -18,6 +18,7 @@ from tkinter import ttk, messagebox
 from nucleo.ambiente import AmbienteCuadricula
 from nucleo.nodo import Nodo
 from nucleo.metricas import MetricasBusqueda
+from nucleo.estructuras import Cola, Pila
 
 from algoritmos.anchura import BusquedaAnchura
 from algoritmos.profundidad import BusquedaProfundidad
@@ -263,7 +264,7 @@ class AplicacionVisualizador:
         self.dibujar_cuadricula()
 
     # -----------------------------------------------------------------
-    # Pestaña 2: Dibujo Gráfico del Árbol de Búsqueda (Alto Contraste)
+    # Pestaña 2: Dibujo Gráfico del Árbol de Búsqueda (Alto Contraste y Bidireccional)
     # -----------------------------------------------------------------
     def configurar_pestana_arbol_grafico(self):
         contenedor = ttk.Frame(self.pestana_arbol_grafico, padding=10)
@@ -299,6 +300,7 @@ class AplicacionVisualizador:
         camino_optimo = resultado_dict.get('camino', []) if resultado_dict else []
         nodos_solucion = resultado_dict.get('nodos_solucion', []) if resultado_dict else []
         todos_caminos = resultado_dict.get('todos_caminos', []) if resultado_dict else []
+        estado_interseccion = resultado_dict.get('estado_interseccion', None) if resultado_dict else None
 
         ids_camino_optimo = {paso[4] for paso in camino_optimo} if camino_optimo else set()
         
@@ -307,97 +309,178 @@ class AplicacionVisualizador:
             for paso in c:
                 ids_todos_caminos.add(paso[4])
 
-        costo_optimo = camino_optimo[-1][2] if camino_optimo else 0
         largo_optimo = len(camino_optimo) - 1 if camino_optimo else 0
+        es_bidireccional = (estado_interseccion is not None)
 
-        info_soluciones = f"Total Nodos: {len(nodos_arbol)} | Soluciones Encontradas: {len(nodos_solucion)} | "
-        if nodos_solucion:
-            costos_sol = [f"Sol#{i+1}: {n.costo} pasos" for i, n in enumerate(nodos_solucion)]
-            info_soluciones += f"Óptima (Dorado): {largo_optimo} pasos | Alternativas (Naranja): [{', '.join(costos_sol)}]"
+        if es_bidireccional:
+            self.lbl_arbol_resumen.config(
+                text=f"↔️ BÚSQUEDA BIDIRECCIONAL: Árbol Hacia Adelante (Azul) ──► ⚡ Punto de Encuentro {estado_interseccion} ◄── Árbol Hacia Atrás (Naranja) | Camino Total: {largo_optimo} pasos"
+            )
         else:
-            info_soluciones += "No se alcanzó el objetivo en esta búsqueda."
-
-        self.lbl_arbol_resumen.config(text=info_soluciones)
-
-        # Organizar por niveles de profundidad
-        niveles = {}
-        for nodo in nodos_arbol:
-            d = nodo.profundidad
-            if d not in niveles:
-                niveles[d] = []
-            niveles[d].append(nodo)
+            info_soluciones = f"Total Nodos: {len(nodos_arbol)} | Soluciones Encontradas: {len(nodos_solucion)} | "
+            if nodos_solucion:
+                costos_sol = [f"Sol#{i+1}: {n.costo} pasos" for i, n in enumerate(nodos_solucion)]
+                info_soluciones += f"Óptima (Dorado): {largo_optimo} pasos | Alternativas (Naranja): [{', '.join(costos_sol)}]"
+            else:
+                info_soluciones += "No se alcanzó el objetivo en esta búsqueda."
+            self.lbl_arbol_resumen.config(text=info_soluciones)
 
         posiciones = {}
-        distancia_y = 80
-        separacion_x = 85
+        distancia_y = 85
+        separacion_x = 90
 
-        max_nodos_nivel = max(len(nodos_nivel) for nodos_nivel in niveles.values())
-        ancho_total = max(1400, max_nodos_nivel * separacion_x + 160)
+        if es_bidireccional:
+            nodos_adelante = []
+            nodos_atras = []
 
-        for d in sorted(niveles.keys()):
-            nodos_en_nivel = niveles[d]
-            cantidad = len(nodos_en_nivel)
-            pos_y = 50 + d * distancia_y
-            ancho_nivel = (cantidad - 1) * separacion_x
-            inicio_x = (ancho_total - ancho_nivel) / 2.0
+            for nodo in nodos_arbol:
+                actual = nodo
+                mientras_val = None
+                while actual:
+                    mientras_val = actual.estado
+                    actual = actual.padre
+                
+                if mientras_val == self.ambiente.estado_inicial:
+                    nodos_adelante.append(nodo)
+                else:
+                    nodos_atras.append(nodo)
 
-            for i, nodo in enumerate(nodos_en_nivel):
-                pos_x = inicio_x + i * separacion_x
-                posiciones[nodo.id] = (pos_x, pos_y)
+            niveles_adelante = {}
+            for n in nodos_adelante:
+                d = n.profundidad
+                niveles_adelante.setdefault(d, []).append(n)
 
-        # -----------------------------------------------------------------
-        # Dibujar Aristas / Ramas con Colores Vivos de Alto Contraste
-        # -----------------------------------------------------------------
+            niveles_atras = {}
+            for n in nodos_atras:
+                d = n.profundidad
+                niveles_atras.setdefault(d, []).append(n)
+
+            max_nodos_f = max((len(v) for v in niveles_adelante.values()), default=1)
+            max_nodos_b = max((len(v) for v in niveles_atras.values()), default=1)
+            ancho_bloque = max(750, max(max_nodos_f, max_nodos_b) * separacion_x + 100)
+
+            for d in sorted(niveles_adelante.keys()):
+                nodos_lvl = niveles_adelante[d]
+                cant = len(nodos_lvl)
+                pos_y = 70 + d * distancia_y
+                ancho_lvl = (cant - 1) * separacion_x
+                inicio_x = 50 + (ancho_bloque - ancho_lvl) / 2.0
+
+                for i, nodo in enumerate(nodos_lvl):
+                    posiciones[nodo.id] = (inicio_x + i * separacion_x, pos_y, "ADELANTE")
+
+            offset_x_atras = ancho_bloque + 120
+            for d in sorted(niveles_atras.keys()):
+                nodos_lvl = niveles_atras[d]
+                cant = len(nodos_lvl)
+                pos_y = 70 + d * distancia_y
+                ancho_lvl = (cant - 1) * separacion_x
+                inicio_x = offset_x_atras + (ancho_bloque - ancho_lvl) / 2.0
+
+                for i, nodo in enumerate(nodos_lvl):
+                    posiciones[nodo.id] = (inicio_x + i * separacion_x, pos_y, "ATRAS")
+
+            self.lienzo_arbol.create_text(
+                ancho_bloque / 2.0 + 50, 25,
+                text="🔵 ÁRBOL HACIA ADELANTE (Desde S₀)",
+                fill="#00D2FF", font=("Segoe UI", 11, "bold")
+            )
+            self.lienzo_arbol.create_text(
+                offset_x_atras + ancho_bloque / 2.0, 25,
+                text="🟠 ÁRBOL HACIA ATRÁS (Desde S_g)",
+                fill="#FF7043", font=("Segoe UI", 11, "bold")
+            )
+
+        else:
+            niveles = {}
+            for nodo in nodos_arbol:
+                d = nodo.profundidad
+                niveles.setdefault(d, []).append(nodo)
+
+            max_nodos_nivel = max(len(nodos_nivel) for nodos_nivel in niveles.values())
+            ancho_total = max(1400, max_nodos_nivel * separacion_x + 160)
+
+            for d in sorted(niveles.keys()):
+                nodos_en_nivel = niveles[d]
+                cantidad = len(nodos_en_nivel)
+                pos_y = 60 + d * distancia_y
+                ancho_nivel = (cantidad - 1) * separacion_x
+                inicio_x = (ancho_total - ancho_nivel) / 2.0
+
+                for i, nodo in enumerate(nodos_en_nivel):
+                    posiciones[nodo.id] = (inicio_x + i * separacion_x, pos_y, "ESTANDAR")
+
         for nodo in nodos_arbol:
             if nodo.padre and nodo.padre.id in posiciones and nodo.id in posiciones:
-                px, py = posiciones[nodo.padre.id]
-                cx, cy = posiciones[nodo.id]
+                px, py = posiciones[nodo.padre.id][0], posiciones[nodo.padre.id][1]
+                cx, cy = posiciones[nodo.id][0], posiciones[nodo.id][1]
 
                 if nodo.id in ids_camino_optimo and nodo.padre.id in ids_camino_optimo:
-                    linea_color = self.color_camino_optimo # DORADO NEÓN BRRILLANTE
+                    linea_color = self.color_camino_optimo
                     ancho_linea = 5
                 elif nodo.id in ids_todos_caminos and nodo.padre.id in ids_todos_caminos:
-                    linea_color = self.color_camino_alt    # NARANJA NEÓN
+                    linea_color = self.color_camino_alt
                     ancho_linea = 3
                 else:
-                    linea_color = "#252a3b"                 # Oscuro para ramas secundarias
+                    linea_color = "#222638"
                     ancho_linea = 1
 
                 self.lienzo_arbol.create_line(px, py, cx, cy, fill=linea_color, width=ancho_linea)
 
-        # -----------------------------------------------------------------
-        # Dibujar Nodos con Alto Contraste Visual y Texto Legible
-        # -----------------------------------------------------------------
-        radio = 22
+        if es_bidireccional:
+            nodos_encuentro_adelante = [n for n in nodos_arbol if n.estado == estado_interseccion and posiciones[n.id][2] == "ADELANTE"]
+            nodos_encuentro_atras = [n for n in nodos_arbol if n.estado == estado_interseccion and posiciones[n.id][2] == "ATRAS"]
+
+            if nodos_encuentro_adelante and nodos_encuentro_atras:
+                nf = nodos_encuentro_adelante[0]
+                nb = nodos_encuentro_atras[0]
+                fx, fy = posiciones[nf.id][0], posiciones[nf.id][1]
+                bx, by = posiciones[nb.id][0], posiciones[nb.id][1]
+
+                self.lienzo_arbol.create_line(fx, fy, bx, by, fill=self.color_camino_optimo, width=6, dash=(6, 4))
+                self.lienzo_arbol.create_text((fx + bx)/2, (fy + by)/2 - 12, text="⚡ PUNTO DE ENCUENTRO ⚡", fill="#FFD700", font=("Segoe UI", 9, "bold"))
+
+        radio = 24
         for nodo in nodos_arbol:
             if nodo.id not in posiciones:
                 continue
 
-            cx, cy = posiciones[nodo.id]
+            cx, cy, rama_tipo = posiciones[nodo.id]
             texto_color = "#ffffff"
+            ancho_borde = 2
+
+            es_encuentro = (es_bidireccional and nodo.estado == estado_interseccion)
 
             if nodo.estado == self.ambiente.estado_inicial:
-                color_relleno = self.color_inicio          # PINK / MAGENTA NEÓN (S_0)
+                color_relleno = self.color_inicio
                 color_borde = "#ffffff"
                 texto_color = "#ffffff"
-                ancho_borde = 3
+                ancho_borde = 4
             elif nodo.estado == AmbienteCuadricula.ESTADO_OBJETIVO:
-                color_relleno = self.color_meta            # VERDE ESMERALDA NEÓN (S_g Metas)
+                color_relleno = self.color_meta
                 color_borde = "#ffffff"
                 texto_color = "#000000"
                 ancho_borde = 4
+            elif es_encuentro:
+                color_relleno = self.color_camino_optimo
+                color_borde = "#00FF66"
+                texto_color = "#000000"
+                ancho_borde = 4
             elif nodo.id in ids_camino_optimo:
-                color_relleno = self.color_camino_optimo   # DORADO NEÓN (Camino Óptimo)
+                color_relleno = self.color_camino_optimo
                 color_borde = "#ffffff"
                 texto_color = "#000000"
                 ancho_borde = 3
-            elif nodo.id in ids_todos_caminos:
-                color_relleno = self.color_camino_alt      # NARANJA NEÓN (Caminos Alt.)
-                color_borde = "#ffffff"
+            elif rama_tipo == "ADELANTE":
+                color_relleno = "#003b5c"
+                color_borde = "#00d2ff"
                 texto_color = "#ffffff"
-                ancho_borde = 2
+            elif rama_tipo == "ATRAS":
+                color_relleno = "#5c2b00"
+                color_borde = "#ff7043"
+                texto_color = "#ffffff"
             else:
-                color_relleno = self.color_nodo_normal     # OSCURO CHARCOAL (Explorado)
+                color_relleno = self.color_nodo_normal
                 color_borde = "#3a405a"
                 texto_color = "#b0b8db"
                 ancho_borde = 1
@@ -413,11 +496,11 @@ class AplicacionVisualizador:
             self.lienzo_arbol.create_text(cx, cy - 4, text=texto_id, fill=texto_color, font=("Segoe UI", 8, "bold"))
             self.lienzo_arbol.create_text(cx, cy + 7, text=texto_estado, fill=texto_color, font=("Segoe UI", 7, "bold"))
 
+            if es_encuentro:
+                self.lienzo_arbol.create_text(cx, cy + radio + 12, text="⚡ ENCUENTRO", fill="#FFD700", font=("Segoe UI", 8, "bold"))
+
         self.lienzo_arbol.config(scrollregion=self.lienzo_arbol.bbox("all"))
 
-    # -----------------------------------------------------------------
-    # Pestaña 3: Jerarquía de Nodos (Tabla)
-    # -----------------------------------------------------------------
     def configurar_pestana_arbol_tabla(self):
         contenedor = ttk.Frame(self.pestana_arbol_tabla, padding=10)
         contenedor.pack(fill=tk.BOTH, expand=True)
@@ -465,9 +548,6 @@ class AplicacionVisualizador:
                 values=(nodo.id, str(nodo.estado), padre_id_str, accion_str, nodo.costo, nodo.profundidad)
             )
 
-    # -----------------------------------------------------------------
-    # Pestaña 4: Métricas y Análisis Complejidad
-    # -----------------------------------------------------------------
     def configurar_pestana_metricas(self):
         contenedor = ttk.Frame(self.pestana_metricas, padding=10)
         contenedor.pack(fill=tk.BOTH, expand=True)
@@ -524,9 +604,6 @@ class AplicacionVisualizador:
                 )
             )
 
-    # -----------------------------------------------------------------
-    # Lógica de Ejecución y Animación Rápida Adaptativa
-    # -----------------------------------------------------------------
     def al_ejecutar_seleccionado(self):
         nombre_algo = self.var_algoritmo.get()
         s0 = self.ambiente.estado_inicial
@@ -571,7 +648,6 @@ class AplicacionVisualizador:
         retardo_ms = self.deslizador_velocidad.get()
         visitados_acumulados = []
 
-        # Paso adaptativo para no congelar la pantalla cuando hay miles de nodos
         pasos_por_tick = max(1, len(historial) // 50)
 
         def paso_animacion(idx):
