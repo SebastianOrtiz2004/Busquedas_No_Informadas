@@ -59,6 +59,7 @@ class ProfundidadIterativa:
                     continue
 
                 if nodo_actual.profundidad < limite_profundidad:
+                    hijos_generados = []
                     for nuevo_estado, accion in AmbienteCuadricula.obtener_sucesores(nodo_actual.estado):
                         es_meta = AmbienteCuadricula.es_objetivo(nuevo_estado)
                         if es_meta or nuevo_estado not in visitados_iteracion:
@@ -71,7 +72,11 @@ class ProfundidadIterativa:
                             )
                             total_nodos_generados += 1
                             todos_nodos_arbol.append(nodo_hijo)
-                            frontera.apilar(nodo_hijo)
+                            hijos_generados.append(nodo_hijo)
+                            
+                    # Apilamos en reversa para explorar de Izquierda a Derecha
+                    for hijo in reversed(hijos_generados):
+                        frontera.apilar(hijo)
 
             if len(nodos_solucion) >= max_soluciones:
                 break

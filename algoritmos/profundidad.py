@@ -64,6 +64,7 @@ class BusquedaProfundidad:
                 continue
 
             sucesores = AmbienteCuadricula.obtener_sucesores(nodo_actual.estado)
+            hijos_generados = []
             for nuevo_estado, accion in sucesores:
                 es_meta = AmbienteCuadricula.es_objetivo(nuevo_estado)
                 if es_meta or nuevo_estado not in visitados:
@@ -76,7 +77,11 @@ class BusquedaProfundidad:
                     )
                     nodos_generados += 1
                     nodos_arbol.append(nodo_hijo)
-                    frontera.apilar(nodo_hijo)
+                    hijos_generados.append(nodo_hijo)
+            
+            # Apilamos en reversa para que el primero (Norte) quede en el tope y salga primero
+            for hijo in reversed(hijos_generados):
+                frontera.apilar(hijo)
 
         tiempo_fin = time.perf_counter()
 
