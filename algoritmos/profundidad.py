@@ -1,13 +1,14 @@
 """
 Algoritmo 2: Búsqueda en Profundidad (Múltiples Soluciones)
 
-Estructura de Datos de la Frontera: PILA (LIFO) - Lista / Stack
+Estructura de Datos de la Frontera: PILA (LIFO) propia (nucleo.estructuras.Pila).
 Explora el árbol buscando múltiples caminos hacia S_g = (1, 10).
 """
 
 import time
 from nucleo.nodo import Nodo
 from nucleo.ambiente import AmbienteCuadricula
+from nucleo.estructuras import Pila
 
 class BusquedaProfundidad:
     @classmethod
@@ -34,7 +35,8 @@ class BusquedaProfundidad:
                 "nodos_arbol": [raiz]
             }
 
-        frontera = [raiz]
+        # Frontera como instancia de la clase propia Pila (LIFO)
+        frontera = Pila([raiz])
         visitados = set()
 
         nodos_expandidos = 0
@@ -46,7 +48,7 @@ class BusquedaProfundidad:
 
         while frontera and len(nodos_solucion) < max_soluciones:
             tamanio_maximo_frontera = max(tamanio_maximo_frontera, len(frontera))
-            nodo_actual = frontera.pop()
+            nodo_actual = frontera.desapilar()
             
             if nodo_actual.estado in visitados and not AmbienteCuadricula.es_objetivo(nodo_actual.estado):
                 continue
@@ -74,7 +76,7 @@ class BusquedaProfundidad:
                     )
                     nodos_generados += 1
                     nodos_arbol.append(nodo_hijo)
-                    frontera.append(nodo_hijo)
+                    frontera.apilar(nodo_hijo)
 
         tiempo_fin = time.perf_counter()
 

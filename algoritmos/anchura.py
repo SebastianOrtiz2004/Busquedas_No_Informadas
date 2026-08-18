@@ -1,15 +1,14 @@
 """
 Algoritmo 1: Búsqueda en Anchura (Múltiples Soluciones)
 
-Estructura de Datos de la Frontera: COLA (FIFO) - deque
+Estructura de Datos de la Frontera: COLA (FIFO) propia (nucleo.estructuras.Cola).
 Explora el árbol buscando múltiples caminos hacia S_g = (1, 10).
-Permite que distintas ramas alcancen la meta para comparar la solución óptima con las alternativas.
 """
 
 import time
-from collections import deque
 from nucleo.nodo import Nodo
 from nucleo.ambiente import AmbienteCuadricula
+from nucleo.estructuras import Cola
 
 class BusquedaAnchura:
     @classmethod
@@ -36,7 +35,8 @@ class BusquedaAnchura:
                 "nodos_arbol": [raiz]
             }
 
-        frontera = deque([raiz])
+        # Frontera como instancia de la clase propia Cola (FIFO)
+        frontera = Cola([raiz])
         visitados = {raiz.estado}
 
         nodos_expandidos = 0
@@ -48,14 +48,13 @@ class BusquedaAnchura:
 
         while frontera and len(nodos_solucion) < max_soluciones:
             tamanio_maximo_frontera = max(tamanio_maximo_frontera, len(frontera))
-            nodo_actual = frontera.popleft()
+            nodo_actual = frontera.desencolar()
             nodos_expandidos += 1
             historial_exploracion.append(nodo_actual.estado)
 
             for nuevo_estado, accion in AmbienteCuadricula.obtener_sucesores(nodo_actual.estado):
                 es_meta = AmbienteCuadricula.es_objetivo(nuevo_estado)
 
-                # Si es meta o no ha sido visitado aún
                 if es_meta or nuevo_estado not in visitados:
                     if not es_meta:
                         visitados.add(nuevo_estado)
@@ -73,7 +72,7 @@ class BusquedaAnchura:
                     if es_meta:
                         nodos_solucion.append(nodo_hijo)
                     else:
-                        frontera.append(nodo_hijo)
+                        frontera.encolar(nodo_hijo)
 
         tiempo_fin = time.perf_counter()
 

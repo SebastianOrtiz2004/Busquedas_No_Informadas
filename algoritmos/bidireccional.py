@@ -1,32 +1,25 @@
 """
 Algoritmo 4: Búsqueda Bidireccional
 
-Estructura de Datos: DOS COLAS FIFO (deque) - Búsqueda en anchura simultánea.
+Estructura de Datos: DOS COLAS (FIFO) propias (nucleo.estructuras.Cola).
 - Árbol Hacia Adelante (Forward): Desde el Estado Inicial S_0 hacia S_g.
 - Árbol Hacia Atrás (Backward): Desde el Estado Objetivo S_g (1, 10) hacia S_0.
 Punto de Encuentro: Ocurre cuando un estado generado en una frontera ya fue explorado por la frontera opuesta.
-Completitud: Sí.
-Optimidad: Sí (para costo unitario c = 1).
-Complejidad: Reducción drástica a O(b^(d/2)) en tiempo y memoria.
 """
 
 import time
-from collections import deque
 from nucleo.nodo import Nodo
 from nucleo.ambiente import AmbienteCuadricula
+from nucleo.estructuras import Cola
 
 class BusquedaBidireccional:
     @staticmethod
     def resolver(estado_inicial):
-        """
-        Ejecuta la Búsqueda Bidireccional desde S_0 y S_g = (1, 10).
-        """
         Nodo.reiniciar_contador_ids()
         tiempo_inicio = time.perf_counter()
 
         estado_objetivo = AmbienteCuadricula.ESTADO_OBJETIVO
 
-        # Verificación directa de S_0 == S_g
         if estado_inicial == estado_objetivo:
             raiz = Nodo(estado=estado_inicial, padre=None, accion=None, costo=0, profundidad=0)
             tiempo_fin = time.perf_counter()
@@ -47,12 +40,12 @@ class BusquedaBidireccional:
 
         # Raíz Hacia Adelante (Forward) desde S_0
         nodo_adelante_raiz = Nodo(estado=estado_inicial, padre=None, accion=None, costo=0, profundidad=0)
-        frontera_adelante = deque([nodo_adelante_raiz])
+        frontera_adelante = Cola([nodo_adelante_raiz])
         visitados_adelante = {estado_inicial: nodo_adelante_raiz}
 
         # Raíz Hacia Atrás (Backward) desde S_g = (1, 10)
         nodo_atras_raiz = Nodo(estado=estado_objetivo, padre=None, accion=None, costo=0, profundidad=0)
-        frontera_atras = deque([nodo_atras_raiz])
+        frontera_atras = Cola([nodo_atras_raiz])
         visitados_atras = {estado_objetivo: nodo_atras_raiz}
 
         nodos_expandidos = 0
@@ -69,11 +62,9 @@ class BusquedaBidireccional:
             tamanio_frontera_actual = len(frontera_adelante) + len(frontera_atras)
             tamanio_maximo_frontera = max(tamanio_maximo_frontera, tamanio_frontera_actual)
 
-            # -------------------------------------------------------------
             # Paso 1: Expansión Hacia Adelante
-            # -------------------------------------------------------------
             if frontera_adelante:
-                curr_a = frontera_adelante.popleft()
+                curr_a = frontera_adelante.desencolar()
                 nodos_expandidos += 1
                 historial_exploracion.append(curr_a.estado)
 
@@ -89,9 +80,8 @@ class BusquedaBidireccional:
                         visitados_adelante[nuevo_estado] = hijo_a
                         nodos_generados += 1
                         todos_nodos_arbol.append(hijo_a)
-                        frontera_adelante.append(hijo_a)
+                        frontera_adelante.encolar(hijo_a)
 
-                        # ¿Se interseca con el árbol Hacia Atrás?
                         if nuevo_estado in visitados_atras:
                             estado_interseccion = nuevo_estado
                             nodo_interseccion_adelante = hijo_a
@@ -101,11 +91,9 @@ class BusquedaBidireccional:
             if estado_interseccion is not None:
                 break
 
-            # -------------------------------------------------------------
             # Paso 2: Expansión Hacia Atrás
-            # -------------------------------------------------------------
             if frontera_atras:
-                curr_t = frontera_atras.popleft()
+                curr_t = frontera_atras.desencolar()
                 nodos_expandidos += 1
                 historial_exploracion.append(curr_t.estado)
 
@@ -123,9 +111,8 @@ class BusquedaBidireccional:
                         visitados_atras[estado_previo] = hijo_t
                         nodos_generados += 1
                         todos_nodos_arbol.append(hijo_t)
-                        frontera_atras.append(hijo_t)
+                        frontera_atras.encolar(hijo_t)
 
-                        # ¿Se interseca con el árbol Hacia Adelante?
                         if estado_previo in visitados_adelante:
                             estado_interseccion = estado_previo
                             nodo_interseccion_adelante = visitados_adelante[estado_previo]
@@ -140,11 +127,9 @@ class BusquedaBidireccional:
         secuencia_acciones = []
 
         if estado_interseccion is not None:
-            # 1. Camino desde S_0 hasta el punto de intersección
             camino_adelante = nodo_interseccion_adelante.obtener_camino()
             camino_completo.extend(camino_adelante)
 
-            # 2. Camino desde el punto de intersección hasta S_g = (1, 10)
             atras_actual = nodo_interseccion_atras
             costo_actual = nodo_interseccion_adelante.costo
             profundidad_actual = nodo_interseccion_adelante.profundidad

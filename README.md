@@ -4,6 +4,8 @@ Este repositorio contiene la solución completa e interactiva desarrollada en **
 
 El proyecto modela a un **agente inteligente no informado** que percibe su entorno dentro de un plano cartesiano discreto de $10 \times 20$ cerámicas (aula de clases). El agente no posee información previa del espacio ni heurísticas guiadas; únicamente percibe su estado actual $S$ y aplica su **Función Sucesora formal** respetando las barreras del aula.
 
+> 💡 **Implementación de Estructuras de Datos Propias:** No se utilizaron librerías externas ni auxiliares para las fronteras (`deque`, etc.). Las clases **`Cola`** (FIFO) y **`Pila`** (LIFO) fueron programadas **desde cero** en [nucleo/estructuras.py](file:///c:/Users/sebas/OneDrive%20-%20UNIVERSIDAD%20T%C3%89CNICA%20DE%20AMBATO/Inteligencia%20Artificial%202/B%C3%BAsquedas%20no%20Informadas/nucleo/estructuras.py).
+
 ---
 
 ## 📌 Formulación Formal del Problema
@@ -17,7 +19,7 @@ El proyecto modela a un **agente inteligente no informado** que percibe su entor
   * $\text{Norte}: (x, y + 1)$ si $y < 20$
   * $\text{Sur}: (x, y - 1)$ si $y > 1$
   * $\text{Este}: (x + 1, y)$ si $x < 10$
-  * $\text{Oeste}: (x - 1, y)$ if $x > 1$
+  * $\text{Oeste}: (x - 1, y)$ si $x > 1$
 * **Costo del Camino ($g(n)$):** Costo unitario $c(s, a, s') = 1$ por cada movimiento.
 
 ---
@@ -25,16 +27,16 @@ El proyecto modela a un **agente inteligente no informado** que percibe su entor
 ## 🚀 Estrategias de Búsqueda Implementadas
 
 1. **🏦 Búsqueda en Anchura:**
-   * Estructura de Datos: **COLA (FIFO)** (`deque`).
+   * Estructura de Datos: **`Cola` propia (FIFO)** (`encolar`, `desencolar`).
    * Explora por niveles de profundidad. Garantiza completitud y la solución óptima.
 2. **🥞 Búsqueda en Profundidad:**
-   * Estructura de Datos: **PILA (LIFO)** (`list.pop()`).
-   * Explora las ramas hasta la máxima profundidad acotada por el control de nodos visitados por rama.
+   * Estructura de Datos: **`Pila` propia (LIFO)** (`apilar`, `desapilar`).
+   * Explora las ramas hasta la máxima profundidad acotada por el control de nodos visitados.
 3. **🔄 Profundidad Iterativa:**
-   * Estructura de Datos: **PILA (LIFO) con Límite $L$ creciente ($0, 1, 2, \dots$)**.
+   * Estructura de Datos: **`Pila` propia (LIFO)** con Límite $L$ creciente ($0, 1, 2, \dots$).
    * Combina la ventaja de memoria de profundidad con la optimidad de anchura.
 4. **↔️ Búsqueda Bidireccional:**
-   * Estructura de Datos: **DOS COLAS (FIFO)** simultáneas.
+   * Estructura de Datos: **DOS `Cola` propias (FIFO)** simultáneas.
    * Lanza un frente desde $S_0$ y otro desde $S_g = (1, 10)$ hasta detectar el punto de intersección.
 
 ---
@@ -55,14 +57,15 @@ El proyecto modela a un **agente inteligente no informado** que percibe su entor
 ```
 Búsquedas no Informadas/
 ├── nucleo/
+│   ├── estructuras.py          # CLASES PROPIAS: Cola (FIFO) y Pila (LIFO) sin librerías
 │   ├── nodo.py                 # Clase Nodo (Padre, costo g(n), profundidad d, id)
 │   ├── ambiente.py             # Clase AmbienteCuadricula (Aula 10x20 y Función Sucesora)
 │   └── metricas.py             # Calculadora de fórmulas exactas y complejidades
 ├── algoritmos/
-│   ├── anchura.py              # Búsqueda en Anchura
-│   ├── profundidad.py          # Búsqueda en Profundidad
-│   ├── profundidad_iterativa.py# Profundidad Iterativa
-│   └── bidireccional.py        # Búsqueda Bidireccional
+│   ├── anchura.py              # Búsqueda en Anchura (Usa Cola propia)
+│   ├── profundidad.py          # Búsqueda en Profundidad (Usa Pila propia)
+│   ├── profundidad_iterativa.py# Profundidad Iterativa (Usa Pila propia)
+│   └── bidireccional.py        # Búsqueda Bidireccional (Usa dos Cola propias)
 ├── visualizador/
 │   └── aplicacion.py           # Dashboard visual e interactivo Tkinter
 ├── pruebas/

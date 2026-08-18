@@ -1,24 +1,15 @@
 """
-Algoritmo 3: Profundidad Iterativa (Optimizado y Múltiples Soluciones)
+Algoritmo 3: Profundidad Iterativa (Múltiples Soluciones)
 
-Estructura de Datos de la Frontera: PILA (LIFO) con Límite L creciente.
-Optimizado para registrar únicamente estados únicos en la animación y evitar cuelgues.
+Estructura de Datos de la Frontera: PILA (LIFO) propia (nucleo.estructuras.Pila).
 """
 
 import time
 from nucleo.nodo import Nodo
 from nucleo.ambiente import AmbienteCuadricula
+from nucleo.estructuras import Pila
 
 class ProfundidadIterativa:
-    @staticmethod
-    def _tiene_ciclo(nodo, estado):
-        actual = nodo
-        while actual:
-            if actual.estado == estado:
-                return True
-            actual = actual.padre
-        return False
-
     @classmethod
     def resolver(cls, estado_inicial, limite_profundidad_maximo=200, max_soluciones=5):
         Nodo.reiniciar_contador_ids()
@@ -30,7 +21,6 @@ class ProfundidadIterativa:
         todos_nodos_arbol = []
         nodos_solucion = []
 
-        # Usar conjunto para registrar el historial de exploración único sin duplicados por iteraciones
         historial_set = set()
         historial_exploracion = []
 
@@ -43,12 +33,13 @@ class ProfundidadIterativa:
                 historial_set.add(raiz.estado)
                 historial_exploracion.append(raiz.estado)
 
-            frontera = [raiz]
+            # Frontera como instancia de la clase propia Pila (LIFO)
+            frontera = Pila([raiz])
             visitados_iteracion = set()
 
             while frontera and len(nodos_solucion) < max_soluciones:
                 maxima_frontera_global = max(maxima_frontera_global, len(frontera))
-                nodo_actual = frontera.pop()
+                nodo_actual = frontera.desapilar()
 
                 if nodo_actual.estado in visitados_iteracion and not AmbienteCuadricula.es_objetivo(nodo_actual.estado):
                     continue
@@ -63,7 +54,6 @@ class ProfundidadIterativa:
                     historial_exploracion.append(nodo_actual.estado)
 
                 if AmbienteCuadricula.es_objetivo(nodo_actual.estado):
-                    # Solo agregar si este camino objetivo es único o diferente
                     if not any(s.estado == nodo_actual.estado and s.costo == nodo_actual.costo for s in nodos_solucion):
                         nodos_solucion.append(nodo_actual)
                     continue
@@ -81,7 +71,7 @@ class ProfundidadIterativa:
                             )
                             total_nodos_generados += 1
                             todos_nodos_arbol.append(nodo_hijo)
-                            frontera.append(nodo_hijo)
+                            frontera.apilar(nodo_hijo)
 
             if len(nodos_solucion) >= max_soluciones:
                 break
